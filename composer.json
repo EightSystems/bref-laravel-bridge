@@ -13,7 +13,7 @@
     "require": {
         "php": "^8.0",
         "aws/aws-sdk-php": "^3.222",
-        "bref/bref": "dev-master as 2.4.9",
+        "bref/bref": "2.4.9",
         "bref/laravel-health-check": "^1",
         "bref/monolog-bridge": "^1.0",
         "illuminate/container": "^8.0 || ^9.0 || ^10.0 || ^11.0 || ^12.0",
@@ -31,12 +31,6 @@
         "phpunit/phpunit": "^9.5 || ^10 || ^11",
         "squizlabs/php_codesniffer": "^3.7"
     },
-    "repositories": [
-        {
-            "type": "git",
-            "url": "https://github.com/EightSystems/bref.git"
-        }
-    ],
     "minimum-stability": "dev",
     "prefer-stable": true,
     "autoload": {
