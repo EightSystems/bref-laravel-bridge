@@ -11,10 +11,6 @@ use Bref\Context\Context;
 use Bref\Event\Http\HttpHandler;
 use Bref\Event\Http\HttpResponse;
 use Bref\Event\Http\HttpRequestEvent;
-use Generator;
-use ReflectionFunction;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class OctaneHandler extends HttpHandler
 {
@@ -47,25 +43,8 @@ class OctaneHandler extends HttpHandler
             $response->prepare($request); // https://github.com/laravel/framework/pull/43895
         }
 
-        if (
-            ($response instanceof StreamedResponse) &&
-            ($responseCallback = $response->getCallback()) &&
-            // @phpstan-ignore-next-line
-            ((new ReflectionFunction($responseCallback))->getReturnType()?->getName() === Generator::class)
-        ) {
-            return new HttpResponse(
-                $responseCallback(),
-                $response->headers->all(),
-                $response->getStatusCode()
-            );
-        }
-
-        $content = $response instanceof BinaryFileResponse
-            ? $response->getFile()->getContent()
-            : $response->getContent();
-
         return new HttpResponse(
-            $content,
+            ResponseBodyExtractor::extract($response),
             $response->headers->all(),
             $response->getStatusCode()
         );
