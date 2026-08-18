@@ -11,7 +11,6 @@ use Bref\Context\Context;
 use Bref\Event\Http\HttpHandler;
 use Bref\Event\Http\HttpResponse;
 use Bref\Event\Http\HttpRequestEvent;
-use Bref\Event\Http\StreamedHttpResponse;
 use Generator;
 use ReflectionFunction;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -32,7 +31,7 @@ class OctaneHandler extends HttpHandler
     /**
      * {@inheritDoc}
      */
-    public function handleRequest(HttpRequestEvent $event, Context $context): HttpResponse|StreamedHttpResponse
+    public function handleRequest(HttpRequestEvent $event, Context $context): HttpResponse
     {
         $request = Request::createFromBase(
             SymfonyRequestBridge::convertRequest($event, $context)
@@ -51,9 +50,10 @@ class OctaneHandler extends HttpHandler
         if (
             ($response instanceof StreamedResponse) &&
             ($responseCallback = $response->getCallback()) &&
+            // @phpstan-ignore-next-line
             ((new ReflectionFunction($responseCallback))->getReturnType()?->getName() === Generator::class)
         ) {
-            return new StreamedHttpResponse(
+            return new HttpResponse(
                 $responseCallback(),
                 $response->headers->all(),
                 $response->getStatusCode()
