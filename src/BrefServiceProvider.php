@@ -2,8 +2,13 @@
 
 namespace Bref\LaravelBridge;
 
+use Bref\LaravelBridge\Console\Commands\BrefTinkerCommand;
+use Bref\LaravelBridge\Console\Commands\QueueFailedJobsCountCommand;
+use Bref\LaravelBridge\Console\Commands\QueueFailedJobsListCommand;
+use Bref\LaravelBridge\Console\Commands\QueueFailedJobsShowCommand;
 use Bref\LaravelBridge\Queue\QueueHandler;
 
+use Bref\Monolog\CloudWatchFormatter;
 use Illuminate\Console\Events\ScheduledTaskStarting;
 
 use Illuminate\Log\LogManager;
@@ -36,15 +41,22 @@ class BrefServiceProvider extends ServiceProvider
             return;
         }
 
+        $defaultEmergencyLogPath = $this->app->storagePath('logs/laravel.log');
+
         $this->app->useStoragePath(StorageDirectories::Path);
 
-        $this->fixDefaultConfiguration();
+        $this->fixDefaultConfiguration($defaultEmergencyLogPath);
 
         Config::set('app.mix_url', Config::get('app.asset_url'));
 
         Config::set('trustedproxy.proxies', ['0.0.0.0/0', '2000:0:0:0:0:0:0:0/3']);
 
-        Config::set('view.compiled', StorageDirectories::Path . '/framework/views');
+        // If the views were not compiled yet, move them to a writable directory
+        $currentCompiledPath = Config::get('view.compiled');
+        if (! is_string($currentCompiledPath) || ! is_dir($currentCompiledPath)) {
+            Config::set('view.compiled', StorageDirectories::Path . '/framework/views');
+        }
+
         Config::set('cache.stores.file.path', StorageDirectories::Path . '/framework/cache');
 
         $this->fixAwsCredentialsConfig();
@@ -82,6 +94,20 @@ class BrefServiceProvider extends ServiceProvider
                 ScheduledTaskStarting::class,
                 fn(ScheduledTaskStarting $task) => $task->task->appendOutputTo('/proc/1/fd/1'),
             );
+        }
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                QueueFailedJobsCountCommand::class,
+                QueueFailedJobsListCommand::class,
+                QueueFailedJobsShowCommand::class,
+            ]);
+        }
+
+        if (isset($_SERVER['AWS_LAMBDA_RUNTIME_API'])) {
+            $this->commands([
+                BrefTinkerCommand::class,
+            ]);
         }
     }
 
@@ -146,7 +172,7 @@ class BrefServiceProvider extends ServiceProvider
      *
      * @return void
      */
-    protected function fixDefaultConfiguration()
+    protected function fixDefaultConfiguration(string $defaultEmergencyLogPath)
     {
         if (Config::get('session.driver') === 'file') {
             Config::set('session.driver', 'cookie');
@@ -156,7 +182,11 @@ class BrefServiceProvider extends ServiceProvider
             Config::set('logging.default', 'stderr');
         }
 
-        if (Config::get('logging.channels.emergency.path') === storage_path('logs/laravel.log')) {
+        if (Config::get('logging.channels.stderr.formatter') === null) {
+            Config::set('logging.channels.stderr.formatter', CloudWatchFormatter::class);
+        }
+
+        if (Config::get('logging.channels.emergency.path') === $defaultEmergencyLogPath) {
             Config::set('logging.channels.emergency', Config::get('logging.channels.stderr'));
         }
     }
